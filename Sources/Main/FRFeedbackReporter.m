@@ -210,5 +210,11 @@
     return YES;
 }
 
+
+- (void) orderFront
+{
+    [[feedbackController window] makeKeyAndOrderFront:nil];
+}
+
 @end
 

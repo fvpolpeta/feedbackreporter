@@ -58,6 +58,49 @@
     return [NSString stringWithFormat:targetUrlFormat, project, version];
 }*/
 
+
+////////////
+
+
+- (NSString*) smtpServerForFeedbackReport
+{
+    return @"smtp.gmail.com";
+}
+
+- (unsigned int) smtpPortForFeedbackRerport
+{
+    return 465;
+}
+
+- (NSString*) smtpUsername
+{
+    return @"";
+}
+
+- (NSString*) smtpPassword
+{
+    return @"";
+}
+
+- (NSString*) mailSenderTitle
+{
+    return @"";
+}
+
+- (NSString*) mailSubject
+{
+    return @"Crash Report";
+}
+
+- (NSString*) mailTextBody
+{
+    return @"See attached XML file";
+}
+
+
+////////////
+
+
 - (IBAction) buttonFeedback:(id)sender
 {
     NSLog(@"button");

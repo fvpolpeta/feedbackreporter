@@ -332,19 +332,31 @@
     
     MCOMessageBuilder * builder = [[MCOMessageBuilder alloc] init];
     
-    NSString* senderTitle = [[[FRFeedbackReporter sharedReporter] delegate] mailSenderTitle];
-    [[builder header] setFrom:[MCOAddress addressWithDisplayName:(senderTitle?senderTitle:smtpSession.username)
-                                                         mailbox:smtpSession.username]];
+    ////////
     
-    NSMutableArray *to = [[NSMutableArray alloc] init];
-    NSArray* toArray = [NSArray arrayWithObjects:smtpSession.username, nil];
-    for(NSString *toAddress in toArray)
     {
-        MCOAddress *newAddress = [MCOAddress addressWithMailbox:toAddress];
-        [to addObject:newAddress];
+        NSString* senderTitle = nil;
+        if ([[[FRFeedbackReporter sharedReporter] delegate] respondsToSelector:@selector(mailSenderTitle)])
+            senderTitle = [[[FRFeedbackReporter sharedReporter] delegate] mailSenderTitle];
+        
+        [[builder header] setFrom:[MCOAddress addressWithDisplayName:(senderTitle?senderTitle:smtpSession.username)
+                                                             mailbox:smtpSession.username]];
     }
-    [[builder header] setTo:to];
     
+    ////////
+    
+    {
+        NSMutableArray *to = [[NSMutableArray alloc] init];
+        NSArray* toArray = [NSArray arrayWithObjects:smtpSession.username, nil];
+        for(NSString *toAddress in toArray)
+        {
+            MCOAddress *newAddress = [MCOAddress addressWithMailbox:toAddress];
+            [to addObject:newAddress];
+        }
+        [[builder header] setTo:to];
+    }
+    
+    ////////
     
     /*
      NSMutableArray *cc = [[NSMutableArray alloc] init];
@@ -457,23 +469,23 @@
     
     ///////
     
-    
-    NSString* timeStamp = @"";
-    @synchronized([self class])
     {
-        NSDate *date = [NSDate date];
-        NSDateFormatter *dateFormatter = [NSDateFormatter new];
-        [dateFormatter setFormatterBehavior:NSDateFormatterBehaviorDefault];
-        [dateFormatter setDateFormat:@"yyyyMMddhhmmss"];
-        timeStamp = [dateFormatter stringFromDate:date];
+        NSString* subjectText = nil;
+        if ([[[FRFeedbackReporter sharedReporter] delegate] respondsToSelector:@selector(mailSubject)])
+            subjectText = [[[FRFeedbackReporter sharedReporter] delegate] mailSubject];
+        
+        [[builder header] setSubject:(subjectText?subjectText:NSLocalizedString(@"No Subject",nil))];
     }
-    NSString* subjectText = [[[FRFeedbackReporter sharedReporter] delegate] mailSubject];
-    [[builder header] setSubject:(subjectText?subjectText:NSLocalizedString(@"No Subject",nil))];
     
+    ///////
     
-    NSString* textBody = [[[FRFeedbackReporter sharedReporter] delegate] mailTextBody];
-    [builder setTextBody:(textBody?textBody:@"")];
-    
+    {
+        NSString* textBody = nil;
+        if ([[[FRFeedbackReporter sharedReporter] delegate] respondsToSelector:@selector(mailTextBody)])
+            textBody = [[[FRFeedbackReporter sharedReporter] delegate] mailTextBody];
+        
+        [builder setTextBody:(textBody?textBody:@"")];
+    }
     
     ///////
     
@@ -481,15 +493,85 @@
     NSData * rfc822Data = [builder data];
     MCOSMTPSendOperation *sendOperation = [smtpSession sendOperationWithData:rfc822Data];
     
+    
+    ///////
+    
+    NSLog(@"Sending report by email");
+    
+    [indicator setHidden:NO];
+    [indicator startAnimation:self];
+    
+    [messageView setEditable:NO];
+    [sendButton setEnabled:NO];
+    
     [sendOperation start:^(NSError *error)
     {
          if(error)
          {
              NSLog(@"Error sending report by email. (%@)",error);
+             
+             [indicator stopAnimation:self];
+             [indicator setHidden:YES];
+             
+             [uploader release], uploader = nil;
+             
+             [messageView setEditable:YES];
+             [sendButton setEnabled:YES];
+             
+             NSAlert *alert = [[NSAlert alloc] init];
+             [alert addButtonWithTitle:FRLocalizedString(@"OK", nil)];
+             [alert setMessageText:FRLocalizedString(@"Sorry, failed to submit your feedback to the server.", nil)];
+             [alert setInformativeText:[NSString stringWithFormat:FRLocalizedString(@"Error: %@", nil), [error localizedDescription]]];
+             [alert setAlertStyle:NSWarningAlertStyle];
+             [alert runModal];
+             [alert release];
          }
          else
          {
              NSLog(@"Successfully sent report by email.");
+             
+             [indicator stopAnimation:self];
+             [indicator setHidden:YES];
+             
+             NSString *response = [uploader response];
+             
+             [uploader release], uploader = nil;
+             
+             [messageView setEditable:YES];
+             [sendButton setEnabled:YES];
+             
+             NSArray *lines = [response componentsSeparatedByString:@"\n"];
+             NSUInteger i = [lines count];
+             while(i--) {
+                 NSString *line = [lines objectAtIndex:i];
+                 
+                 if ([line length] == 0) {
+                     continue;
+                 }
+                 
+                 if (![line hasPrefix:@"OK "]) {
+                     
+                     NSLog (@"Failed to submit to server: %@", response);
+                     
+                     NSAlert *alert = [[NSAlert alloc] init];
+                     [alert addButtonWithTitle:FRLocalizedString(@"OK", nil)];
+                     [alert setMessageText:FRLocalizedString(@"Sorry, failed to submit your feedback to the server.", nil)];
+                     [alert setInformativeText:[NSString stringWithFormat:FRLocalizedString(@"Error: %@", nil), line]];
+                     [alert setAlertStyle:NSWarningAlertStyle];
+                     [alert runModal];
+                     [alert release];
+                     
+                     return;
+                 }
+             }
+             
+             [[NSUserDefaults standardUserDefaults] setValue:[NSDate date]
+                                                      forKey:DEFAULTS_KEY_LASTSUBMISSIONDATE];
+             
+             [[NSUserDefaults standardUserDefaults] setObject:[emailBox stringValue]
+                                                       forKey:DEFAULTS_KEY_SENDEREMAIL];
+             
+             [self close];
          }
      }];
 }
@@ -504,6 +586,15 @@
         return;
     }
 
+    if ([[[FRFeedbackReporter sharedReporter] delegate] respondsToSelector:@selector(smtpServerForFeedbackReport)] &&
+        [[[FRFeedbackReporter sharedReporter] delegate] respondsToSelector:@selector(smtpPortForFeedbackRerport)] &&
+        [[[FRFeedbackReporter sharedReporter] delegate] respondsToSelector:@selector(smtpUsername)] &&
+        [[[FRFeedbackReporter sharedReporter] delegate] respondsToSelector:@selector(smtpPassword)])
+    {
+        [self sendByEmail];
+        return;
+    }
+    
     NSString *target = nil;
 
     if ([[[FRFeedbackReporter sharedReporter] delegate] respondsToSelector:@selector(targetUrlForFeedbackReport)])
@@ -512,25 +603,15 @@
     }
     else
     {
-        [[FRApplication feedbackURL] stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding] ;
+        target = [[FRApplication feedbackURL] stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
     }
 
     if (target == nil)
     {
-        if ([[[FRFeedbackReporter sharedReporter] delegate] respondsToSelector:@selector(smtpServerForFeedbackReport)] &&
-            [[[FRFeedbackReporter sharedReporter] delegate] respondsToSelector:@selector(smtpPortForFeedbackRerport)] &&
-            [[[FRFeedbackReporter sharedReporter] delegate] respondsToSelector:@selector(smtpUsername)] &&
-            [[[FRFeedbackReporter sharedReporter] delegate] respondsToSelector:@selector(smtpPassword)])
-        {
-            [self sendByEmail];
-            return;
-        }
-        else
-        {
-            NSLog(@"You are missing the %@ key in your Info.plist!", PLIST_KEY_TARGETURL);
-            return;
-        }
+        NSLog(@"You are missing the %@ key in your Info.plist!", PLIST_KEY_TARGETURL);
+        return;
     }
+    
 
     NSURL *url = [NSURL URLWithString:target];
 
