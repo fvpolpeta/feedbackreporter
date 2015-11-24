@@ -30,6 +30,15 @@
 #import <AddressBook/AddressBook.h>
 #import <SystemConfiguration/SystemConfiguration.h>
 
+#import <MailCore/MailCore.h>
+
+
+@interface FRFeedbackController ()
+
+- (void) sendByEmail;
+
+@end
+
 
 @implementation FRFeedbackController
 
@@ -311,6 +320,181 @@
     [self close];
 }
 
+- (void) sendByEmail
+{
+    MCOSMTPSession *smtpSession = [[MCOSMTPSession alloc] init];
+    
+    smtpSession.hostname = [[[FRFeedbackReporter sharedReporter] delegate] smtpServerForFeedbackReport];
+    smtpSession.port = [[[FRFeedbackReporter sharedReporter] delegate] smtpPortForFeedbackRerport];;
+    smtpSession.username = [[[FRFeedbackReporter sharedReporter] delegate] smtpUsername];
+    smtpSession.password= [[[FRFeedbackReporter sharedReporter] delegate] smtpPassword];
+    smtpSession.connectionType = MCOConnectionTypeTLS;
+    
+    MCOMessageBuilder * builder = [[MCOMessageBuilder alloc] init];
+    
+    NSString* senderTitle = [[[FRFeedbackReporter sharedReporter] delegate] mailSenderTitle];
+    [[builder header] setFrom:[MCOAddress addressWithDisplayName:(senderTitle?senderTitle:smtpSession.username)
+                                                         mailbox:smtpSession.username]];
+    
+    NSMutableArray *to = [[NSMutableArray alloc] init];
+    NSArray* toArray = [NSArray arrayWithObjects:smtpSession.username, nil];
+    for(NSString *toAddress in toArray)
+    {
+        MCOAddress *newAddress = [MCOAddress addressWithMailbox:toAddress];
+        [to addObject:newAddress];
+    }
+    [[builder header] setTo:to];
+    
+    
+    /*
+     NSMutableArray *cc = [[NSMutableArray alloc] init];
+     
+     NSArray* toCC = [NSArray arrayWithObjects:@"fauze.polpeta@gmail.com", nil];
+     
+     for(NSString *ccAddress in toCC)
+     {
+     MCOAddress *newAddress = [MCOAddress addressWithMailbox:ccAddress];
+     [cc addObject:newAddress];
+     }
+     [[builder header] setCc:cc];
+     
+     
+     NSMutableArray *bcc = [[NSMutableArray alloc] init];
+     for(NSString *bccAddress in BCC)
+     {
+     MCOAddress *newAddress = [MCOAddress addressWithMailbox:bccAddress];
+     [bcc addObject:newAddress];
+     }
+     [[builder header] setBcc:bcc];
+     */
+    
+    
+    ///////
+    
+    
+    NSMutableDictionary *dict = [NSMutableDictionary dictionary];
+    
+    [dict setValidString:[emailBox stringValue]
+                  forKey:POST_KEY_EMAIL];
+    
+    [dict setValidString:[messageView string]
+                  forKey:POST_KEY_MESSAGE];
+    
+    [dict setValidString:type
+                  forKey:POST_KEY_TYPE];
+    
+    [dict setValidString:[FRApplication applicationLongVersion]
+                  forKey:POST_KEY_VERSION_LONG];
+    
+    [dict setValidString:[FRApplication applicationShortVersion]
+                  forKey:POST_KEY_VERSION_SHORT];
+    
+    [dict setValidString:[FRApplication applicationBundleVersion]
+                  forKey:POST_KEY_VERSION_BUNDLE];
+    
+    [dict setValidString:[FRApplication applicationVersion]
+                  forKey:POST_KEY_VERSION];
+    
+    if ([sendDetailsCheckbox state] == NSOnState) {
+        if ([delegate respondsToSelector:@selector(customParametersForFeedbackReport)]) {
+            [dict addEntriesFromDictionary:[delegate customParametersForFeedbackReport]];
+        }
+        
+        [dict setValidString:[self systemProfileAsString]
+                      forKey:POST_KEY_SYSTEM];
+        
+        [dict setValidString:[consoleView string]
+                      forKey:POST_KEY_CONSOLE];
+        
+        [dict setValidString:[crashesView string]
+                      forKey:POST_KEY_CRASHES];
+        
+        [dict setValidString:[scriptView string]
+                      forKey:POST_KEY_SHELL];
+        
+        [dict setValidString:[preferencesView string]
+                      forKey:POST_KEY_PREFERENCES];
+        
+        [dict setValidString:[exceptionView string]
+                      forKey:POST_KEY_EXCEPTION];
+    }
+    
+    
+    if (![NSPropertyListSerialization propertyList:dict isValidForFormat:NSPropertyListXMLFormat_v1_0]) {
+        NSLog (@"can't save as XML");
+        return;
+    }
+    
+    
+    {
+        NSError *error = nil;
+        NSData *data = [NSPropertyListSerialization dataWithPropertyList:dict
+                                                                  format:NSPropertyListXMLFormat_v1_0
+                                                                 options: 0
+                                                                   error: &error];
+        if (data == nil) {
+            NSLog (@"error serializing to xml: %@", error);
+            return;
+        }
+        
+        char path[4096];
+        tmpnam(path);
+        NSString* attachmentPath = [NSString stringWithUTF8String:path];
+        
+        BOOL writeStatus = [data writeToFile:attachmentPath
+                                     options:NSDataWritingAtomic
+                                       error:&error];
+        if (!writeStatus)
+        {
+            NSLog (@"error writing to file: %@", error);
+            return;
+        }
+        
+        MCOAttachment *attachment = [MCOAttachment attachmentWithContentsOfFile:attachmentPath];
+        [builder addAttachment:attachment];
+    }
+    
+    
+    ///////
+    
+    
+    NSString* timeStamp = @"";
+    @synchronized([self class])
+    {
+        NSDate *date = [NSDate date];
+        NSDateFormatter *dateFormatter = [NSDateFormatter new];
+        [dateFormatter setFormatterBehavior:NSDateFormatterBehaviorDefault];
+        [dateFormatter setDateFormat:@"yyyyMMddhhmmss"];
+        timeStamp = [dateFormatter stringFromDate:date];
+    }
+    NSString* subjectText = [[[FRFeedbackReporter sharedReporter] delegate] mailSubject];
+    [[builder header] setSubject:(subjectText?subjectText:NSLocalizedString(@"No Subject",nil))];
+    
+    
+    NSString* textBody = [[[FRFeedbackReporter sharedReporter] delegate] mailTextBody];
+    [builder setTextBody:(textBody?textBody:@"")];
+    
+    
+    ///////
+    
+
+    NSData * rfc822Data = [builder data];
+    MCOSMTPSendOperation *sendOperation = [smtpSession sendOperationWithData:rfc822Data];
+    
+    [sendOperation start:^(NSError *error)
+    {
+         if(error)
+         {
+             NSLog(@"Error sending report by email. (%@)",error);
+         }
+         else
+         {
+             NSLog(@"Successfully sent report by email.");
+         }
+     }];
+}
+
+
 - (IBAction) send:(id)sender
 {
 	(void)sender;
@@ -320,15 +504,32 @@
         return;
     }
 
-    NSString *target = [[FRApplication feedbackURL] stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding] ;
+    NSString *target = nil;
 
-    if ([[[FRFeedbackReporter sharedReporter] delegate] respondsToSelector:@selector(targetUrlForFeedbackReport)]) {
+    if ([[[FRFeedbackReporter sharedReporter] delegate] respondsToSelector:@selector(targetUrlForFeedbackReport)])
+    {
         target = [[[FRFeedbackReporter sharedReporter] delegate] targetUrlForFeedbackReport];
     }
+    else
+    {
+        [[FRApplication feedbackURL] stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding] ;
+    }
 
-    if (target == nil) {
-        NSLog(@"You are missing the %@ key in your Info.plist!", PLIST_KEY_TARGETURL);
-        return;
+    if (target == nil)
+    {
+        if ([[[FRFeedbackReporter sharedReporter] delegate] respondsToSelector:@selector(smtpServerForFeedbackReport)] &&
+            [[[FRFeedbackReporter sharedReporter] delegate] respondsToSelector:@selector(smtpPortForFeedbackRerport)] &&
+            [[[FRFeedbackReporter sharedReporter] delegate] respondsToSelector:@selector(smtpUsername)] &&
+            [[[FRFeedbackReporter sharedReporter] delegate] respondsToSelector:@selector(smtpPassword)])
+        {
+            [self sendByEmail];
+            return;
+        }
+        else
+        {
+            NSLog(@"You are missing the %@ key in your Info.plist!", PLIST_KEY_TARGETURL);
+            return;
+        }
     }
 
     NSURL *url = [NSURL URLWithString:target];
@@ -423,7 +624,7 @@
 {
 	(void)pUploader;
 
-    // NSLog(@"Upload started");
+    NSLog(@"Upload started");
 
     [indicator setHidden:NO];
     [indicator startAnimation:self];

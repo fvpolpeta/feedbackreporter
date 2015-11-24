@@ -1,0 +1,14 @@
+[
+ {
+  "file": "/Users/fauze/Developer/FauzApps/Projects/FZFeedbackReporter/Sources/Tests/UploaderTestCase.h",
+  "offset": 612,
+  "remove": 31,
+  "text": "<XCTest/XCTest.h>",
+ },
+ {
+  "file": "/Users/fauze/Developer/FauzApps/Projects/FZFeedbackReporter/Sources/Tests/UploaderTestCase.h",
+  "offset": 699,
+  "remove": 11,
+  "text": "XCTestCase",
+ },
+]

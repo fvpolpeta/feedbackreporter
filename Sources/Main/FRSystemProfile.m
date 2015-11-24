@@ -108,9 +108,10 @@
     // Intel
     if (cputype == CPU_TYPE_X86) {
         char stringValue[256] = {0};
+        char* stringValuePointer = &stringValue[0];
         size_t stringLength = sizeof(stringValue);
-        error = sysctlbyname("machdep.cpu.brand_string", &stringValue, &stringLength, NULL, 0);
-        if ((error == 0) && (stringValue != NULL)) {
+        error = sysctlbyname("machdep.cpu.brand_string", stringValuePointer, &stringLength, NULL, 0);
+        if ((error == 0) && (stringValuePointer != NULL)) {
             NSString *brandString = [NSString stringWithUTF8String:stringValue];
             if (brandString)
                 return brandString;
@@ -132,11 +133,19 @@
             case CPUFAMILY_INTEL_YONAH:
                 return @"Intel Core Duo";
             case CPUFAMILY_INTEL_MEROM:
-                return @"Intel Core 2 Duo";
+                return @"Intel Core 2 Duo (Merom)";
             case CPUFAMILY_INTEL_PENRYN:
                 return @"Intel Core 2 Duo (Penryn)";
             case CPUFAMILY_INTEL_NEHALEM:
-                return @"Intel Xeon (Nehalem)";
+                return @"Intel Nehalem";
+            case CPUFAMILY_INTEL_WESTMERE:
+                return @"Intel Westmere";
+            case CPUFAMILY_INTEL_SANDYBRIDGE:
+                return @"Intel Sandybridge";
+            case CPUFAMILY_INTEL_IVYBRIDGE:
+                return @"Intel Ivybridge";
+            case CPUFAMILY_INTEL_HASWELL:
+                return @"Intel Haswell";
         }
         return nil;
     }

@@ -1,0 +1,32 @@
+[
+ {
+  "file": "/Users/fauze/Developer/FauzApps/Projects/FZFeedbackReporter/Sources/Tests/CommandTestCase.m",
+  "offset": 990,
+  "remove": 12,
+  "text": "XCTAssertTrue",
+ },
+ {
+  "file": "/Users/fauze/Developer/FauzApps/Projects/FZFeedbackReporter/Sources/Tests/CommandTestCase.m",
+  "offset": 1056,
+  "remove": 12,
+  "text": "XCTAssertTrue",
+ },
+ {
+  "file": "/Users/fauze/Developer/FauzApps/Projects/FZFeedbackReporter/Sources/Tests/CommandTestCase.m",
+  "offset": 1122,
+  "remove": 12,
+  "text": "XCTAssertTrue",
+ },
+ {
+  "file": "/Users/fauze/Developer/FauzApps/Projects/FZFeedbackReporter/Sources/Tests/CommandTestCase.h",
+  "offset": 631,
+  "remove": 31,
+  "text": "<XCTest/XCTest.h>",
+ },
+ {
+  "file": "/Users/fauze/Developer/FauzApps/Projects/FZFeedbackReporter/Sources/Tests/CommandTestCase.h",
+  "offset": 693,
+  "remove": 11,
+  "text": "XCTestCase",
+ },
+]

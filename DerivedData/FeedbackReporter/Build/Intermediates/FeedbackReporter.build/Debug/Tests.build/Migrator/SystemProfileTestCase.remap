@@ -1,0 +1,20 @@
+[
+ {
+  "file": "/Users/fauze/Developer/FauzApps/Projects/FZFeedbackReporter/Sources/Tests/SystemProfileTestCase.m",
+  "offset": 786,
+  "remove": 12,
+  "text": "XCTAssertTrue",
+ },
+ {
+  "file": "/Users/fauze/Developer/FauzApps/Projects/FZFeedbackReporter/Sources/Tests/SystemProfileTestCase.h",
+  "offset": 607,
+  "remove": 31,
+  "text": "<XCTest/XCTest.h>",
+ },
+ {
+  "file": "/Users/fauze/Developer/FauzApps/Projects/FZFeedbackReporter/Sources/Tests/SystemProfileTestCase.h",
+  "offset": 676,
+  "remove": 11,
+  "text": "XCTestCase",
+ },
+]
